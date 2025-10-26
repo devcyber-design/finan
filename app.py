@@ -67,7 +67,7 @@ def get_categories(transaction_type):
         return expense_categories
 
 # --- Layout ---
-st.set_page_config(page_title="Dashboard Financeiro", page_icon="💰", layout="wide")
+st.set_page_config(page_title="Dash Money", page_icon="💰", layout="wide")
 
 # --- Inicialização do State ---
 if "df" not in st.session_state:
@@ -458,3 +458,4 @@ elif st.session_state.page == "lancamento":
                 st.rerun()
             else:
                 st.error("O valor deve ser maior que zero.")
+
