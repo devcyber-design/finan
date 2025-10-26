@@ -36,6 +36,7 @@ def add_transaction(df, date, type, category, value, description, parcelas=1):
         })
     new_df = pd.DataFrame(new_rows)
     df = pd.concat([df, new_df], ignore_index=True)
+    df.sort_values(by="Data", inplace=True) # Garantir que os dados fiquem ordenados por data
     save_data(df)
     return df
 
@@ -57,13 +58,14 @@ def get_categories(transaction_type):
 # --- Layout ---
 st.set_page_config(page_title="Dashboard Financeiro", page_icon="💰", layout="wide")
 
-# --- Inicialização ---
+# --- Inicialização do State ---
 if "df" not in st.session_state:
     st.session_state.df = load_data()
 if "page" not in st.session_state:
     st.session_state.page = "visao_geral"
 if "analise_tipo" not in st.session_state:
     st.session_state.analise_tipo = "despesas"
+# Definindo um valor padrão robusto para o tipo de transação
 if "transaction_type" not in st.session_state:
     st.session_state.transaction_type = "Receita"
 
@@ -72,9 +74,9 @@ df = st.session_state.df.copy()
 df["Data"] = pd.to_datetime(df["Data"], errors="coerce")
 
 # --- HEADER COM BOTÕES DE NAVEGAÇÃO ---
-st.title("💰 Dashboard Financeiro")
+st.title("💰 Dash Money")
 
-# Criar quatro colunas para os botões (agora com Visão Geral)
+# Criar quatro colunas para os botões
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
@@ -311,8 +313,12 @@ elif st.session_state.page == "historico":
     else:
         df_display = df.copy()
         df_display["Data"] = df_display["Data"].dt.strftime("%d/%m/%Y")
-        df_display.reset_index(inplace=True)
+        # Usar o índice do DataFrame original (df) para a exclusão
+        df_display.reset_index(inplace=True) 
         df_display.rename(columns={"index": "ID"}, inplace=True)
+        
+        # Filtro para garantir que apenas IDs válidos sejam exibidos no selectbox
+        valid_ids = df_display["ID"].tolist()
         
         st.dataframe(df_display[["ID", "Data", "Tipo", "Categoria", "Valor", "Descrição"]].sort_values(by="Data", ascending=False), 
                     use_container_width=True, 
@@ -321,56 +327,81 @@ elif st.session_state.page == "historico":
         st.divider()
         
         st.subheader("🗑️ Excluir Transação")
-        selected_id = st.selectbox("Selecione o ID da transação:", df_display["ID"])
-        selected_row = df_display.loc[df_display["ID"] == selected_id]
-        st.write("**Transação selecionada:**")
-        st.dataframe(selected_row, use_container_width=True)
+        
+        # Apenas mostrar o selectbox se houver transações
+        if valid_ids:
+            selected_id = st.selectbox("Selecione o ID da transação:", valid_ids)
+            selected_row = df_display.loc[df_display["ID"] == selected_id]
+            st.write("**Transação selecionada:**")
+            st.dataframe(selected_row, use_container_width=True)
 
-        if st.button("Excluir Transação", type="secondary"):
-            st.session_state.df = delete_transaction(st.session_state.df, selected_id)
-            st.success("Transação excluída com sucesso!")
-            st.rerun()
+            if st.button("Excluir Transação", type="secondary"):
+                # Passar o ID (que é o índice do DataFrame original) para a função
+                st.session_state.df = delete_transaction(st.session_state.df, selected_id)
+                st.success("Transação excluída com sucesso!")
+                st.rerun()
+        else:
+            st.info("Nenhuma transação disponível para exclusão.")
 
-# --- Página: NOVO LANÇAMENTO ---
+
+# --- Página: NOVO LANÇAMENTO (CORRIGIDA) ---
 elif st.session_state.page == "lancamento":
     st.subheader("➕ Novo Lançamento")
 
+    # 1. MOVER A SELEÇÃO DO TIPO DE TRANSAÇÃO PARA FORA DO FORM
+    # Isso garante que o Streamlit irá re-renderizar a página imediatamente quando o valor mudar,
+    # permitindo que as categorias e opções recorrentes sejam carregadas corretamente.
+    transaction_type = st.radio(
+        "Tipo de Transação", 
+        ["Receita", "Despesa"], 
+        horizontal=True,
+        index=0 if st.session_state.transaction_type == "Receita" else 1,
+        key="transaction_type_radio" # Adicionei uma chave
+    )
+    st.session_state.transaction_type = transaction_type # Atualiza o state
+    st.divider()
+
+    # 2. O FORMULARIO AGORA DEPENDE DO VALOR SELECIONADO ACIMA
     with st.form("novo_lancamento"):
-        # Usar o valor atual do session_state como padrão
-        transaction_type = st.radio(
-            "Tipo de Transação", 
-            ["Receita", "Despesa"], 
-            horizontal=True,
-            index=0 if st.session_state.transaction_type == "Receita" else 1
-        )
         
-        # Atualizar o session_state quando o usuário mudar a seleção
-        st.session_state.transaction_type = transaction_type
-        
-        date = st.date_input("Data", value=datetime.now().date(), format="DD/MM/YYYY")
-        value = st.number_input("Valor", min_value=0.01, format="%.2f")
-        description = st.text_input("Descrição (Opcional)")
+        col_date, col_value = st.columns(2)
+        with col_date:
+             date = st.date_input("Data", value=datetime.now().date(), format="DD/MM/YYYY")
+        with col_value:
+             value = st.number_input("Valor", min_value=0.01, format="%.2f", key="value_input")
+             
+        description = st.text_input("Descrição (Opcional)", key="description_input")
 
-        # Carregar categorias baseadas no tipo selecionado
+        # Carregar categorias baseadas no tipo selecionado (agora pega o valor ATUAL)
         categories = get_categories(transaction_type)
-        category = st.selectbox("Categoria", categories)
+        category = st.selectbox("Categoria", categories, key="category_select")
 
-        # Apenas mostrar opção de parcelamento para despesas
+        # Apenas mostrar opção de parcelamento/recorrência para despesas
+        parcelas = 1
         if transaction_type == "Despesa":
-            recurring = st.checkbox("Despesa Parcelada / Recorrente")
-            parcelas = 1
+            st.subheader("Opções Adicionais")
+            # Este bloco aparecerá corretamente quando transaction_type for "Despesa"
+            recurring = st.checkbox("Despesa Parcelada / Recorrente", key="recurring_checkbox")
+            
             if recurring:
-                parcelas = st.number_input("Número de parcelas (meses)", min_value=2, max_value=36, value=2, step=1)
-        else:
-            recurring = False
-            parcelas = 1
-
+                parcelas = st.number_input(
+                    "Número de parcelas (meses)", 
+                    min_value=2, 
+                    max_value=36, 
+                    value=2, 
+                    step=1,
+                    key="parcelas_input"
+                )
+        
         submitted = st.form_submit_button("Salvar Lançamento", type="primary")
         
         if submitted:
+            # Converter a data de volta para datetime.date para uso na função
+            final_date = date
+            
             if value > 0:
                 st.session_state.df = add_transaction(
-                    st.session_state.df, date, transaction_type, category, value, description, parcelas
+                    st.session_state.df, final_date, transaction_type, category, value, description, parcelas
                 )
                 st.success(f"Lançamento de R$ {value:.2f} registrado com sucesso!")
                 st.session_state.page = "visao_geral"
