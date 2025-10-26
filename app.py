@@ -10,18 +10,28 @@ FILE_PATH = "finances.csv"
 
 # --- Funções de Dados ---
 def load_data():
+    """Carrega os dados do arquivo CSV ou cria um DataFrame vazio."""
     if os.path.exists(FILE_PATH):
-        df = pd.read_csv(FILE_PATH)
+        try:
+            df = pd.read_csv(FILE_PATH)
+        except Exception as e:
+            st.error(f"Erro ao carregar dados: {e}")
+            df = pd.DataFrame(columns=["Data", "Tipo", "Categoria", "Valor", "Descrição"])
     else:
         df = pd.DataFrame(columns=["Data", "Tipo", "Categoria", "Valor", "Descrição"])
+        
+    # Garante que a coluna Data é do tipo datetime, tratando erros
     df["Data"] = pd.to_datetime(df["Data"], errors="coerce")
     return df
 
 def save_data(df):
+    """Salva o DataFrame no arquivo CSV."""
     df.to_csv(FILE_PATH, index=False)
 
 def add_transaction(df, date, type, category, value, description, parcelas=1):
+    """Adiciona uma transação, com suporte a parcelamento."""
     new_rows = []
+    # Cria uma linha para cada parcela
     for i in range(parcelas):
         parcela_date = date + relativedelta(months=i)
         desc = description
@@ -36,17 +46,18 @@ def add_transaction(df, date, type, category, value, description, parcelas=1):
         })
     new_df = pd.DataFrame(new_rows)
     df = pd.concat([df, new_df], ignore_index=True)
-    df.sort_values(by="Data", inplace=True) # Garantir que os dados fiquem ordenados por data
+    df.sort_values(by="Data", inplace=True) 
     save_data(df)
     return df
 
 def delete_transaction(df, index):
+    """Exclui uma transação pelo índice."""
     df = df.drop(index).reset_index(drop=True)
     save_data(df)
     return df
 
 def get_categories(transaction_type):
-    """Retorna as categorias baseadas no tipo de transação"""
+    """Retorna as categorias baseadas no tipo de transação."""
     income_categories = ["Salário", "Investimento", "Freelance", "Presente", "Vendas", "Outros"]
     expense_categories = ["Alimentação", "Transporte", "Moradia", "Lazer", "Saúde", "Educação", "Contas", "Compras", "Outros"]
     
@@ -65,7 +76,6 @@ if "page" not in st.session_state:
     st.session_state.page = "visao_geral"
 if "analise_tipo" not in st.session_state:
     st.session_state.analise_tipo = "despesas"
-# Definindo um valor padrão robusto para o tipo de transação
 if "transaction_type" not in st.session_state:
     st.session_state.transaction_type = "Receita"
 
@@ -74,7 +84,7 @@ df = st.session_state.df.copy()
 df["Data"] = pd.to_datetime(df["Data"], errors="coerce")
 
 # --- HEADER COM BOTÕES DE NAVEGAÇÃO ---
-st.title("💰 Dash Money")
+st.title("💰 Dashboard Financeiro")
 
 # Criar quatro colunas para os botões
 col1, col2, col3, col4 = st.columns(4)
@@ -138,8 +148,21 @@ if st.session_state.page == "visao_geral":
         with col1:
             # --- Gráfico de evolução mensal ---
             df["Ano"] = df["Data"].dt.year
-            df["Mês"] = df["Data"].dt.month_name(locale="pt_BR")
+            # Mapeamento manual de meses para evitar problemas de locale e compatibilidade de versão do pandas.
+            month_names_pt_br = {
+                1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril', 
+                5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto', 
+                9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+            }
+            df["Mês"] = df["Data"].dt.month.map(month_names_pt_br)
             monthly_balance = df.groupby(["Ano", "Mês", "Tipo"])["Valor"].sum().reset_index()
+            
+            # Ordenação manual dos meses para o Plotly não depender de locale
+            month_order = [
+                'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+            ]
+            
             fig = px.bar(
                 monthly_balance,
                 x="Mês",
@@ -149,6 +172,7 @@ if st.session_state.page == "visao_geral":
                 facet_col="Ano",
                 title="📈 Evolução Mensal de Receitas e Despesas",
                 color_discrete_map={"Receita": "#1E90FF", "Despesa": "#DC143C"},
+                category_orders={"Mês": month_order} # Aplica a ordem correta
             )
             st.plotly_chart(fig, use_container_width=True)
 
@@ -263,13 +287,26 @@ elif st.session_state.page == "analise":
         elif tipo == "mensal":
             st.subheader("📅 Comparativo Mensal (Receita x Despesa)")
             df["Ano"] = df["Data"].dt.year
-            df["Mês"] = df["Data"].dt.month_name(locale="pt_BR")
+            # Mapeamento manual de meses para evitar problemas de locale e compatibilidade de versão do pandas.
+            month_names_pt_br = {
+                1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril', 
+                5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto', 
+                9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+            }
+            df["Mês"] = df["Data"].dt.month.map(month_names_pt_br)
+            
             monthly_summary = (
                 df.groupby(["Ano", "Mês", "Tipo"])["Valor"]
                 .sum()
                 .reset_index()
-                .sort_values(by=["Ano"])
             )
+            
+            # Ordenação manual dos meses
+            month_order = [
+                'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+            ]
+            
             if not monthly_summary.empty:
                 fig = px.bar(
                     monthly_summary,
@@ -280,6 +317,7 @@ elif st.session_state.page == "analise":
                     facet_col="Ano",
                     title="Comparativo Mensal por Ano",
                     color_discrete_map={"Receita": "#1E90FF", "Despesa": "#DC143C"},
+                    category_orders={"Mês": month_order} # Aplica a ordem correta
                 )
                 st.plotly_chart(fig, use_container_width=True)
             else:
@@ -330,7 +368,11 @@ elif st.session_state.page == "historico":
         
         # Apenas mostrar o selectbox se houver transações
         if valid_ids:
-            selected_id = st.selectbox("Selecione o ID da transação:", valid_ids)
+            # Garante que o selectbox tem um valor padrão válido
+            default_id = valid_ids[0] if valid_ids else None
+            
+            selected_id = st.selectbox("Selecione o ID da transação:", valid_ids, index=valid_ids.index(default_id) if default_id in valid_ids else 0)
+            
             selected_row = df_display.loc[df_display["ID"] == selected_id]
             st.write("**Transação selecionada:**")
             st.dataframe(selected_row, use_container_width=True)
@@ -348,20 +390,19 @@ elif st.session_state.page == "historico":
 elif st.session_state.page == "lancamento":
     st.subheader("➕ Novo Lançamento")
 
-    # 1. MOVER A SELEÇÃO DO TIPO DE TRANSAÇÃO PARA FORA DO FORM
+    # FIX: MOVER A SELEÇÃO DO TIPO DE TRANSAÇÃO PARA FORA DO FORM
     # Isso garante que o Streamlit irá re-renderizar a página imediatamente quando o valor mudar,
-    # permitindo que as categorias e opções recorrentes sejam carregadas corretamente.
+    # carregando as categorias e opções de recorrência corretamente.
     transaction_type = st.radio(
         "Tipo de Transação", 
         ["Receita", "Despesa"], 
         horizontal=True,
         index=0 if st.session_state.transaction_type == "Receita" else 1,
-        key="transaction_type_radio" # Adicionei uma chave
+        key="transaction_type_radio"
     )
     st.session_state.transaction_type = transaction_type # Atualiza o state
     st.divider()
 
-    # 2. O FORMULARIO AGORA DEPENDE DO VALOR SELECIONADO ACIMA
     with st.form("novo_lancamento"):
         
         col_date, col_value = st.columns(2)
@@ -378,12 +419,16 @@ elif st.session_state.page == "lancamento":
 
         # Apenas mostrar opção de parcelamento/recorrência para despesas
         parcelas = 1
+        recurring = False # Inicializa como False
+        
         if transaction_type == "Despesa":
             st.subheader("Opções Adicionais")
-            # Este bloco aparecerá corretamente quando transaction_type for "Despesa"
+            # Este bloco aparece corretamente quando transaction_type for "Despesa"
             recurring = st.checkbox("Despesa Parcelada / Recorrente", key="recurring_checkbox")
             
             if recurring:
+                # O usuário pode usar "recorrente" para indicar despesas contínuas ou parceladas.
+                # Se for recorrente, o número de parcelas indica quantos meses será repetido.
                 parcelas = st.number_input(
                     "Número de parcelas (meses)", 
                     min_value=2, 
@@ -396,14 +441,19 @@ elif st.session_state.page == "lancamento":
         submitted = st.form_submit_button("Salvar Lançamento", type="primary")
         
         if submitted:
-            # Converter a data de volta para datetime.date para uso na função
             final_date = date
             
             if value > 0:
                 st.session_state.df = add_transaction(
                     st.session_state.df, final_date, transaction_type, category, value, description, parcelas
                 )
-                st.success(f"Lançamento de R$ {value:.2f} registrado com sucesso!")
+                
+                if parcelas > 1:
+                     st.success(f"Lançamento de R$ {value:.2f} registrado e parcelado em {parcelas} meses!")
+                else:
+                     st.success(f"Lançamento de R$ {value:.2f} registrado com sucesso!")
+
+                # Redireciona para a visão geral após o sucesso
                 st.session_state.page = "visao_geral"
                 st.rerun()
             else:
