@@ -46,6 +46,9 @@ def add_transaction(df, date, type, category, value, description, parcelas=1):
         })
     new_df = pd.DataFrame(new_rows)
     df = pd.concat([df, new_df], ignore_index=True)
+    # CORREÇÃO: Garante que a coluna 'Data' seja do tipo pd.Timestamp antes de ordenar, 
+    # evitando erros de comparação de tipos mistos (datetime.date vs pd.Timestamp).
+    df["Data"] = pd.to_datetime(df["Data"], errors="coerce")
     df.sort_values(by="Data", inplace=True) 
     save_data(df)
     return df
@@ -67,7 +70,7 @@ def get_categories(transaction_type):
         return expense_categories
 
 # --- Layout ---
-st.set_page_config(page_title="Dash Money", page_icon="💰", layout="wide")
+st.set_page_config(page_title="Dashboard Financeiro", page_icon="💰", layout="wide")
 
 # --- Inicialização do State ---
 if "df" not in st.session_state:
@@ -84,7 +87,7 @@ df = st.session_state.df.copy()
 df["Data"] = pd.to_datetime(df["Data"], errors="coerce")
 
 # --- HEADER COM BOTÕES DE NAVEGAÇÃO ---
-st.title("💰 Dashboard Financeiro")
+st.title("💰 Dash Money")
 
 # Criar quatro colunas para os botões
 col1, col2, col3, col4 = st.columns(4)
@@ -458,4 +461,3 @@ elif st.session_state.page == "lancamento":
                 st.rerun()
             else:
                 st.error("O valor deve ser maior que zero.")
-
