@@ -1,6 +1,4 @@
 streamlit
 plotly
 pandas
-os
-datetime
-relativedelta
+numpy
