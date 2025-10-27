@@ -70,7 +70,7 @@ def get_categories(transaction_type):
         return expense_categories
 
 # --- Layout ---
-st.set_page_config(page_title="Dashboard Financeiro", page_icon="💰", layout="wide")
+st.set_page_config(page_title="Gestor Financeiro", page_icon="💰", layout="wide")
 
 # --- Inicialização do State ---
 if "df" not in st.session_state:
@@ -87,7 +87,7 @@ df = st.session_state.df.copy()
 df["Data"] = pd.to_datetime(df["Data"], errors="coerce")
 
 # --- HEADER COM BOTÕES DE NAVEGAÇÃO ---
-st.title("💰 Dash Money")
+st.title("💰 Gestor Financeiro")
 
 # Criar quatro colunas para os botões
 col1, col2, col3, col4 = st.columns(4)
