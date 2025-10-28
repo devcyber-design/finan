@@ -146,9 +146,10 @@ if not df.empty:
 
 st.sidebar.title("Gestor Financeiro")
 
-# Mapeamento para os botões
+# Mapeamento para os botões (ADICIONANDO RESUMO)
 pages = {
     "➕ Lançamento": "lancamento",
+    "✨ Resumo": "resumo",       # Adiciona a página de Resumo
     "🏠 Visão Geral": "visao_geral",
     "📊 Análise": "analise",
     "📅 Histórico": "historico"
@@ -166,7 +167,7 @@ for label, key in pages.items():
         <script>
             function collapseSidebar() {
                 const closeButton = document.querySelector('button[aria-label="Close sidebar"]') ||
-                                    document.querySelector('button[aria-label="Fechar Menu"]');
+                                     document.querySelector('button[aria-label="Fechar Menu"]');
                 if (closeButton) {
                     closeButton.click();
                 }
@@ -190,33 +191,8 @@ main_col, metric_col = st.columns([3, 1])
 
 # --- BLOCO DE MÉTRICAS FIXAS (Coluna da Direita) ---
 with metric_col:
-    # Apenas exibe as métricas se houver dados
-    if not df.empty:
-        total_balance = df["Valor Ajustado"].sum()
-        total_income = df[df["Tipo"] == "Receita"]["Valor"].sum()
-        total_expense = df[df["Tipo"] == "Despesa"]["Valor"].sum()
-        
-        # TÍTULO "RESUMO" CENTRALIZADO E AJUSTADO
-        st.markdown("<h3 style='text-align: center; margin-top: 0; margin-bottom: 0.5rem;'>Resumo</h3>", unsafe_allow_html=True) 
-
-        # Métricas empilhadas verticalmente para caber na coluna estreita
-        # Usando a função de formatação
-        st.markdown(
-            f"<div style='background:#2E8B57;padding:8px;border-radius:8px;text-align:center;color:white; margin-bottom: 5px;'>"
-            f"<h4 style='margin:0;font-size:12px;'>💰 Saldo Total</h4><h3 style='margin:0;font-size:16px;'>{format_currency(total_balance)}</h3></div>",
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            f"<div style='background:#1E90FF;padding:8px;border-radius:8px;text-align:center;color:white; margin-bottom: 5px;'>"
-            f"<h4 style='margin:0;font-size:12px;'>⬆️ Total de Receitas</h4><h3 style='margin:0;font-size:16px;'>{format_currency(total_income)}</h3></div>",
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            f"<div style='background:#DC143C;padding:8px;border-radius:8px;text-align:center;color:white; margin-bottom: 5px;'>"
-            f"<h4 style='margin:0;font-size:12px;'>⬇️ Total de Despesas</h4><h3 style='margin:0;font-size:16px;'>{format_currency(total_expense)}</h3></div>",
-            unsafe_allow_html=True,
-        )
-        st.divider()
+    # A coluna da direita agora só tem um separador, já que as métricas foram movidas para a página 'resumo'.
+    st.divider()
 
 
 # ----------------------------------------------------------------------------------
@@ -224,8 +200,107 @@ with metric_col:
 # ----------------------------------------------------------------------------------
 with main_col:
     
+    # --- Página: RESUMO (NOVA PÁGINA) ---
+    if st.session_state.page == "resumo":
+        st.subheader("✨ Resumo Financeiro")
+        
+        if df.empty:
+            st.info("Nenhuma transação registrada ainda.")
+        else:
+            # Cálculo das métricas
+            total_balance = df["Valor Ajustado"].sum()
+            total_income = df[df["Tipo"] == "Receita"]["Valor"].sum()
+            total_expense = df[df["Tipo"] == "Despesa"]["Valor"].sum()
+            
+            # Exibição das métricas em 3 colunas para preencher o espaço principal
+            col_b, col_i, col_e = st.columns(3)
+
+            with col_b:
+                st.markdown(
+                    f"<div style='background:#2E8B57;padding:15px;border-radius:10px;text-align:center;color:white; margin-bottom: 5px;'>"
+                    f"<h4 style='margin:0;font-size:14px;'>💰 Saldo Total</h4><h3 style='margin:0;font-size:20px;'>{format_currency(total_balance)}</h3></div>",
+                    unsafe_allow_html=True,
+                )
+            with col_i:
+                st.markdown(
+                    f"<div style='background:#1E90FF;padding:15px;border-radius:10px;text-align:center;color:white; margin-bottom: 5px;'>"
+                    f"<h4 style='margin:0;font-size:14px;'>⬆️ Total de Receitas</h4><h3 style='margin:0;font-size:20px;'>{format_currency(total_income)}</h3></div>",
+                    unsafe_allow_html=True,
+                )
+            with col_e:
+                st.markdown(
+                    f"<div style='background:#DC143C;padding:15px;border-radius:10px;text-align:center;color:white; margin-bottom: 5px;'>"
+                    f"<h4 style='margin:0;font-size:14px;'>⬇️ Total de Despesas</h4><h3 style='margin:0;font-size:20px;'>{format_currency(total_expense)}</h3></div>",
+                    unsafe_allow_html=True,
+                )
+            
+            st.markdown("---")
+            
+            # --- NOVO GRÁFICO: EVOLUÇÃO CUMULATIVA (RECEITA, DESPESA E SALDO) ---
+            st.caption("Evolução Cumulativa: Receitas, Despesas e Saldo")
+
+            # 1. Copiar e ordenar por Data (ascendente para o cumulativo)
+            df_plot = df.copy()
+            df_plot.sort_values(by="Data", ascending=True, inplace=True)
+            
+            # 2. Calcular Receita, Despesa e Saldo (Cumulativos)
+            df_plot['Receita_diaria'] = df_plot.apply(lambda x: x['Valor'] if x['Tipo'] == 'Receita' else 0, axis=1)
+            df_plot['Despesa_diaria'] = df_plot.apply(lambda x: x['Valor'] if x['Tipo'] == 'Despesa' else 0, axis=1)
+            
+            # Agrupar por data (para transações do mesmo dia) e calcular acumulados
+            df_grouped = df_plot.groupby("Data").agg({
+                "Receita_diaria": "sum",
+                "Despesa_diaria": "sum",
+                "Valor Ajustado": "sum"
+            }).reset_index()
+
+            # Calcular as somas acumuladas
+            df_grouped["Receita Acumulada"] = df_grouped["Receita_diaria"].cumsum()
+            df_grouped["Despesa Acumulada"] = df_grouped["Despesa_diaria"].cumsum()
+            df_grouped["Saldo Cumulativo"] = df_grouped["Valor Ajustado"].cumsum()
+            
+            # 3. Derreter (melt) os dados para plotar múltiplas linhas com Plotly Express
+            df_melt = df_grouped.melt(
+                id_vars=['Data'],
+                value_vars=['Receita Acumulada', 'Despesa Acumulada', 'Saldo Cumulativo'],
+                var_name='Métrica',
+                value_name='Valor'
+            )
+            
+            # Mapeamento de cores para consistência
+            color_map = {
+                'Receita Acumulada': '#1E90FF',  # Azul (Receita)
+                'Despesa Acumulada': '#DC143C',  # Vermelho (Despesa)
+                'Saldo Cumulativo': '#2E8B57'   # Verde (Saldo)
+            }
+
+            # 4. Criar o gráfico de linha
+            fig = px.line(
+                df_melt,
+                x="Data",
+                y="Valor",
+                color="Métrica", # Usa a métrica para diferenciar as linhas
+                title="Evolução Financeira Acumulativa",
+                markers=True,
+                color_discrete_map=color_map
+            )
+            
+            # Configurações de layout
+            fig.update_layout(
+                height=350, 
+                margin=dict(t=50, b=10, l=10, r=10),
+                xaxis_title="Data",
+                yaxis_title="Valor Acumulado (R$)",
+                hovermode="x unified"
+            )
+            
+            fig.update_traces(line=dict(width=3))
+            
+            st.plotly_chart(fig, use_container_width=True)
+
+
     # --- Página: NOVO LANÇAMENTO ---
-    if st.session_state.page == "lancamento":
+    elif st.session_state.page == "lancamento":
         st.subheader("💰 Novo Lançamento")
 
         # Seleção do Tipo de Transação
@@ -287,9 +362,9 @@ with main_col:
                     )
                     
                     if parcelas > 1:
-                         st.success(f"Lançamento de R$ {value:.2f} registrado e parcelado em {int(parcelas)} meses!")
+                        st.success(f"Lançamento de R$ {value:.2f} registrado e parcelado em {int(parcelas)} meses!")
                     else:
-                         st.success(f"Lançamento de R$ {value:.2f} registrado com sucesso!")
+                        st.success(f"Lançamento de R$ {value:.2f} registrado com sucesso!")
 
                     st.rerun()
                 else:
