@@ -85,111 +85,6 @@ def get_categories(transaction_type):
 # --- Layout ---
 st.set_page_config(page_title="Gestor Financeiro", page_icon="💰", layout="wide")
 
-# ----------------------------------------------------------------------------------
-# --- INJEÇÃO DE CSS E HTML PARA DESTAQUE DO MENU (MOVIDO PARA O TOPO) ---
-# ----------------------------------------------------------------------------------
-
-# 1. Injetar o texto "MENU" usando um elemento DIV e posicionamento absoluto.
-st.markdown("""
-<div id="menu-label-custom">MENU</div>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<style>
-/* 1. Máxima Redução de Margem Superior */
-.css-1y4p8ic { padding-top: 0rem; }
-section.main { 
-    padding-top: 0rem; 
-    padding-right: 1rem;
-    padding-left: 1rem;
-    padding-bottom: 0rem; 
-}
-h1 { margin-top: 0rem !important; padding-top: 0rem !important; }
-h2 { margin-top: 0rem !important; padding-top: 0rem !important; }
-.stButton, .stRadio, .stSelectbox, .stTextInput, .stNumberInput { margin-bottom: -5px; }
-.stForm { padding-bottom: 5px; }
-
-
-/* ---------------------------------------------------- */
-/* 2. DESTAQUE DO BOTÃO DE ABRIR/FECHAR SIDEBAR */
-/* ---------------------------------------------------- */
-
-/* Seletor mais robusto para o botão de toggle do sidebar (por data-testid) */
-[data-testid="stSidebarToggleButton"] {
-    /* Destaque do botão */
-    background-color: #FF5733 !important; /* Laranja/Vermelho (Destaque) */
-    color: white !important; 
-    border: 3px solid #C70039 !important; 
-    border-radius: 5px !important;
-    
-    /* Z-index alto para garantir que fique por cima de outros elementos */
-    z-index: 1000; 
-}
-
-/* Efeito Hover */
-[data-testid="stSidebarToggleButton"]:hover {
-    background-color: #C70039 !important;
-    border-color: #FF5733 !important;
-}
-
-/* ---------------------------------------------------- */
-/* 3. POSICIONAMENTO DO TEXTO "MENU" INJETADO */
-/* ---------------------------------------------------- */
-
-#menu-label-custom {
-    /* Estilo do texto */
-    font-size: 16px;
-    font-weight: 800;
-    color: #F0F8FF; /* Branco Gelo para alto contraste */
-    background-color: #FF5733; /* Cor de fundo de destaque */
-    padding: 5px 8px;
-    border: 3px solid #C70039;
-    border-right: none; /* Remove a borda direita para colar no botão */
-    border-radius: 5px 0 0 5px; /* Arredonda apenas a esquerda */
-    
-    /* Posicionamento Fixo/Absoluto na Header */
-    position: fixed; /* Fica fixo na tela */
-    top: 0px; 
-    left: 0px; 
-    height: 35px; /* Altura do botão */
-    display: flex;
-    align-items: center; /* Centraliza verticalmente o texto */
-    z-index: 1000; /* Z-index alto */
-    
-    /* Ajuste fino para não sobrepor o botão (move a largura do texto) */
-    transform: translateX(10px); /* Move 10px para dentro da header do Streamlit */
-    /* Garante que o display inicial é bloco */
-    display: flex !important;
-}
-
-/* Garante que o rótulo do menu desapareça se o menu lateral estiver visível (Streamlit adiciona a classe .css-169m05z quando a sidebar abre) */
-/* A classe .css-169m05z é um exemplo de seletor que indica que a sidebar está aberta. Deve funcionar na maioria das versões. */
-.css-169m05z #menu-label-custom {
-    display: none !important; 
-}
-
-/* Ajuste fino: move o botão de menu (>> ) para a direita do texto MENU */
-/* Seletor para a header do Streamlit */
-.stApp header {
-    position: relative; 
-}
-
-/* Move o botão (>> ) para a direita do texto (apenas quando o menu está fechado) */
-.stApp header [data-testid="stSidebarToggleButton"] {
-    transform: translateX(75px); /* Move o botão (tamanho aproximado do "MENU") */
-    transition: transform 0.2s ease-in-out; /* Transição suave */
-}
-
-/* Quando a sidebar abre, volta à posição original (sem a classe .css-169m05z) */
-.css-169m05z [data-testid="stSidebarToggleButton"] {
-    transform: translateX(0px) !important; 
-}
-
-
-</style>
-""", unsafe_allow_html=True)
-
-
 # --- Inicialização do State ---
 if "df" not in st.session_state:
     st.session_state.df = load_data()
@@ -374,7 +269,7 @@ with main_col:
 
     # --- Página: NOVO LANÇAMENTO ---
     elif st.session_state.page == "lancamento":
-        st.subheader("💰 Novo Lançamento")
+        st.subheader("💰 Gestor Financeiro")
 
         # Seleção do Tipo de Transação
         transaction_type = st.radio(
@@ -717,3 +612,4 @@ with main_col:
                     st.rerun()
             else:
                 st.info("Nenhuma transação disponível para exclusão.")
+
