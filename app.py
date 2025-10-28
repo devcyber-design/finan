@@ -365,18 +365,23 @@ with main_col:
             with col1:
                 if st.button("🧾 Despesas", use_container_width=True, type="primary" if st.session_state.analise_tipo == "despesas" else "secondary"):
                     st.session_state.analise_tipo = "despesas"
+                    st.rerun()  # <--- ADICIONADO PARA FORÇAR A ATUALIZAÇÃO
             with col2:
                 if st.button("💵 Receitas", use_container_width=True, type="primary" if st.session_state.analise_tipo == "receitas" else "secondary"):
                     st.session_state.analise_tipo = "receitas"
+                    st.rerun()  # <--- ADICIONADO PARA FORÇAR A ATUALIZAÇÃO
             with col3:
                 if st.button("📅 Mensal", use_container_width=True, type="primary" if st.session_state.analise_tipo == "mensal" else "secondary"):
                     st.session_state.analise_tipo = "mensal"
+                    st.rerun()  # <--- ADICIONADO PARA FORÇAR A ATUALIZAÇÃO
             with col4:
                 if st.button("📆 Anual", use_container_width=True, type="primary" if st.session_state.analise_tipo == "anual" else "secondary"):
                     st.session_state.analise_tipo = "anual"
+                    st.rerun()  # <--- ADICIONADO PARA FORÇAR A ATUALIZAÇÃO
 
             st.markdown("---")
 
+            # ... (Restante do código da análise)
             tipo = st.session_state.analise_tipo
 
             # 1️⃣ DESPESAS
@@ -510,3 +515,4 @@ with main_col:
             else:
 
                 st.info("Nenhuma transação disponível para exclusão.")
+
