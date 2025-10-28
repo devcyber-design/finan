@@ -68,7 +68,7 @@ def get_categories(transaction_type):
         return expense_categories
 
 # --- Layout ---
-st.set_page_config(page_title="Dashboard Financeiro", page_icon="💰", layout="wide")
+st.set_page_config(page_title="Gestor Financeiro", page_icon="💰", layout="wide")
 
 # --- CSS Personalizado para diminuir o espaço superior e otimizar espaço ---
 st.markdown("""
@@ -128,7 +128,7 @@ st.sidebar.title("Gestor Financeiro")
 
 # Mapeamento para os botões
 pages = {
-    "➕ Lançamentos": "lancamento",
+    "➕ Lançamento": "lancamento",
     "🏠 Visão Geral": "visao_geral",
     "📊 Análise": "analise",
     "📅 Histórico": "historico"
@@ -211,7 +211,7 @@ with main_col:
     
     # --- Página: NOVO LANÇAMENTO ---
     if st.session_state.page == "lancamento":
-        st.subheader("➕ Novo Lançamento")
+        st.subheader("💰 Gestor Financeiro")
 
         # Seleção do Tipo de Transação
         transaction_type = st.radio(
@@ -508,4 +508,5 @@ with main_col:
                     st.success("Transação excluída com sucesso!")
                     st.rerun()
             else:
+
                 st.info("Nenhuma transação disponível para exclusão.")
