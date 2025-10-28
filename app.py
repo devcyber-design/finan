@@ -8,6 +8,14 @@ from dateutil.relativedelta import relativedelta
 # --- Configurações ---
 FILE_PATH = "finances.csv"
 
+# --- Funções de Ajuda ---
+def format_currency(value):
+    """Formata um valor numérico para o formato de moeda brasileira (R$)."""
+    # Garante que o valor é um número antes de formatar
+    if pd.isna(value):
+        return ""
+    return f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
 # --- Funções de Dados ---
 def load_data():
     """Carrega os dados do arquivo CSV ou cria um DataFrame vazio."""
@@ -22,6 +30,8 @@ def load_data():
         
     # Garante que a coluna Data é do tipo datetime, tratando erros
     df["Data"] = pd.to_datetime(df["Data"], errors="coerce")
+    # Garante que a coluna Valor é numérica
+    df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce").fillna(0)
     return df
 
 def save_data(df):
@@ -71,6 +81,7 @@ def get_categories(transaction_type):
 st.set_page_config(page_title="Gestor Financeiro", page_icon="💰", layout="wide")
 
 # --- CSS Personalizado para diminuir o espaço superior e otimizar espaço ---
+# MANTIDO O SEU EXCELENTE CÓDIGO CSS
 st.markdown("""
 <style>
 /* 1. Máxima Redução de Margem Superior */
@@ -118,7 +129,16 @@ if "transaction_type" not in st.session_state:
 
 # --- Dados ---
 df = st.session_state.df.copy()
-df["Data"] = pd.to_datetime(df["Data"], errors="coerce")
+# Remove linhas com 'Data' inválida (coerção falhou)
+df = df.dropna(subset=["Data"]) 
+df["Data"] = pd.to_datetime(df["Data"]) # Garantindo o tipo datetime
+
+# Cria colunas de sinal e valor ajustado (para saldo e gráficos)
+if not df.empty:
+    df["Sinal"] = df["Tipo"].apply(lambda x: 1 if x == "Receita" else -1)
+    df["Valor Ajustado"] = df["Valor"] * df["Sinal"]
+    df.sort_values(by="Data", ascending=False, inplace=True)
+
 
 # ----------------------------------------------------------------------------------
 # --- NAVEGAÇÃO NA SIDEBAR (Barra Lateral) ---
@@ -136,10 +156,8 @@ pages = {
 
 # Cria os botões de navegação no sidebar
 for label, key in pages.items():
-    # Define o botão ativo como 'primary'
     button_type = "primary" if st.session_state.page == key else "secondary"
     
-    # Se o botão for clicado, atualiza o estado e força o rerun
     if st.sidebar.button(label, use_container_width=True, type=button_type):
         st.session_state.page = key
         
@@ -147,19 +165,17 @@ for label, key in pages.items():
         st.markdown("""
         <script>
             function collapseSidebar() {
-                // Tenta encontrar e clicar no botão de fechar (menu hamburger)
                 const closeButton = document.querySelector('button[aria-label="Close sidebar"]') ||
                                     document.querySelector('button[aria-label="Fechar Menu"]');
                 if (closeButton) {
                     closeButton.click();
                 }
             }
-            // Executa após um breve atraso para garantir que o Streamlit terminou o processamento
             setTimeout(collapseSidebar, 50);
         </script>
         """, unsafe_allow_html=True)
         
-        st.rerun() # Re-executa o script com a nova página
+        st.rerun() 
     
 st.sidebar.markdown("---")
 st.sidebar.caption("Gestor Financeiro v1.0")
@@ -176,8 +192,6 @@ main_col, metric_col = st.columns([3, 1])
 with metric_col:
     # Apenas exibe as métricas se houver dados
     if not df.empty:
-        df["Sinal"] = df["Tipo"].apply(lambda x: 1 if x == "Receita" else -1)
-        df["Valor Ajustado"] = df["Valor"] * df["Sinal"]
         total_balance = df["Valor Ajustado"].sum()
         total_income = df[df["Tipo"] == "Receita"]["Valor"].sum()
         total_expense = df[df["Tipo"] == "Despesa"]["Valor"].sum()
@@ -186,19 +200,20 @@ with metric_col:
         st.markdown("<h3 style='text-align: center; margin-top: 0; margin-bottom: 0.5rem;'>Resumo</h3>", unsafe_allow_html=True) 
 
         # Métricas empilhadas verticalmente para caber na coluna estreita
+        # Usando a função de formatação
         st.markdown(
             f"<div style='background:#2E8B57;padding:8px;border-radius:8px;text-align:center;color:white; margin-bottom: 5px;'>"
-            f"<h4 style='margin:0;font-size:12px;'>💰 Saldo Total</h4><h3 style='margin:0;font-size:16px;'>R$ {total_balance:,.2f}</h3></div>",
+            f"<h4 style='margin:0;font-size:12px;'>💰 Saldo Total</h4><h3 style='margin:0;font-size:16px;'>{format_currency(total_balance)}</h3></div>",
             unsafe_allow_html=True,
         )
         st.markdown(
             f"<div style='background:#1E90FF;padding:8px;border-radius:8px;text-align:center;color:white; margin-bottom: 5px;'>"
-            f"<h4 style='margin:0;font-size:12px;'>⬆️ Total de Receitas</h4><h3 style='margin:0;font-size:16px;'>R$ {total_income:,.2f}</h3></div>",
+            f"<h4 style='margin:0;font-size:12px;'>⬆️ Total de Receitas</h4><h3 style='margin:0;font-size:16px;'>{format_currency(total_income)}</h3></div>",
             unsafe_allow_html=True,
         )
         st.markdown(
             f"<div style='background:#DC143C;padding:8px;border-radius:8px;text-align:center;color:white; margin-bottom: 5px;'>"
-            f"<h4 style='margin:0;font-size:12px;'>⬇️ Total de Despesas</h4><h3 style='margin:0;font-size:16px;'>R$ {total_expense:,.2f}</h3></div>",
+            f"<h4 style='margin:0;font-size:12px;'>⬇️ Total de Despesas</h4><h3 style='margin:0;font-size:16px;'>{format_currency(total_expense)}</h3></div>",
             unsafe_allow_html=True,
         )
         st.divider()
@@ -211,7 +226,7 @@ with main_col:
     
     # --- Página: NOVO LANÇAMENTO ---
     if st.session_state.page == "lancamento":
-        st.subheader("💰 Gestor Financeiro")
+        st.subheader("💰 Novo Lançamento")
 
         # Seleção do Tipo de Transação
         transaction_type = st.radio(
@@ -242,18 +257,24 @@ with main_col:
             parcelas = 1
             recurring = False
             
+            # Recorrência/Parcelamento apenas para Despesas
             if transaction_type == "Despesa":
-                recurring = st.checkbox("Despesa Parcelada / Recorrente", key="recurring_checkbox")
+                # Checkbox em linha para economizar espaço
+                recurring_col, input_col = st.columns([1, 1])
+                with recurring_col:
+                    recurring = st.checkbox("Despesa Parcelada / Recorrente", key="recurring_checkbox")
                 
                 if recurring:
-                    parcelas = st.number_input(
-                        "Número de parcelas (meses)", 
-                        min_value=2, 
-                        max_value=36, 
-                        value=2, 
-                        step=1,
-                        key="parcelas_input"
-                    )
+                    with input_col:
+                        parcelas = st.number_input(
+                            "Número de parcelas (meses)", 
+                            min_value=2, 
+                            max_value=36, 
+                            value=2, 
+                            step=1,
+                            key="parcelas_input",
+                            label_visibility="collapsed" # Esconde o label para alinhamento
+                        )
             
             submitted = st.form_submit_button("Salvar Lançamento", type="primary", use_container_width=True)
             
@@ -262,11 +283,11 @@ with main_col:
                 
                 if value > 0:
                     st.session_state.df = add_transaction(
-                        st.session_state.df, final_date, transaction_type, category, value, description, parcelas
+                        st.session_state.df, final_date, transaction_type, category, value, description, int(parcelas)
                     )
                     
                     if parcelas > 1:
-                         st.success(f"Lançamento de R$ {value:.2f} registrado e parcelado em {parcelas} meses!")
+                         st.success(f"Lançamento de R$ {value:.2f} registrado e parcelado em {int(parcelas)} meses!")
                     else:
                          st.success(f"Lançamento de R$ {value:.2f} registrado com sucesso!")
 
@@ -281,20 +302,27 @@ with main_col:
         if df.empty:
             st.info("Nenhuma transação registrada ainda. Use a barra lateral para ir em 'Lançamentos' e adicionar sua primeira transação.")
         else:
+            
+            # --- Preparações para Gráficos ---
+            df_g = df.copy() # Cria uma cópia para evitar side effects
+            df_g["Ano"] = df_g["Data"].dt.year
+            month_names_pt_br = {
+                1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr', 
+                5: 'Mai', 6: 'Jun', 7: 'Jul', 8: 'Ago', 
+                9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez'
+            }
+            # Usa o month name e o número do mês para ordenação correta no plot
+            df_g["Mês_Num"] = df_g["Data"].dt.month
+            df_g["Mês"] = df_g["Data"].dt.month.map(month_names_pt_br)
+            monthly_balance = df_g.groupby(["Ano", "Mês_Num", "Mês", "Tipo"])["Valor"].sum().reset_index()
+            # Ordena pelo número do mês para o Plotly
+            monthly_balance.sort_values(by=["Ano", "Mês_Num"], inplace=True) 
+
             # Gráficos principais
-            col_graph1, col_graph2 = st.columns(2) # Colunas internas para os gráficos
+            col_graph1, col_graph2 = st.columns([1, 1]) # Colunas internas para os gráficos
 
             with col_graph1:
                 # --- Gráfico de evolução mensal ---
-                df["Ano"] = df["Data"].dt.year
-                month_names_pt_br = {
-                    1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr', 
-                    5: 'Mai', 6: 'Jun', 7: 'Jul', 8: 'Ago', 
-                    9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez'
-                }
-                df["Mês"] = df["Data"].dt.month.map(month_names_pt_br)
-                monthly_balance = df.groupby(["Ano", "Mês", "Tipo"])["Valor"].sum().reset_index()
-                
                 month_order = [
                     'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 
                     'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'
@@ -311,15 +339,16 @@ with main_col:
                     color_discrete_map={"Receita": "#1E90FF", "Despesa": "#DC143C"},
                     category_orders={"Mês": month_order} 
                 )
-                fig.update_layout(height=350, margin=dict(t=50, b=10, l=10, r=10)) # Diminui a altura
+                fig.update_layout(height=350, margin=dict(t=50, b=10, l=10, r=10), uniformtext_minsize=8, uniformtext_mode='hide') # Diminui a altura
+                fig.update_yaxes(title_text="Valor (R$)") # Adiciona rótulo ao eixo Y
                 st.plotly_chart(fig, use_container_width=True)
 
             with col_graph2:
                 # --- Gráficos de pizza para receitas e despesas ---
-                tab1, tab2 = st.tabs(["Receitas", "Despesas"])
+                tab1, tab2 = st.tabs(["Receitas por Categoria", "Despesas por Categoria"])
                 
                 with tab1:
-                    income_df = df[df["Tipo"] == "Receita"]
+                    income_df = df_g[df_g["Tipo"] == "Receita"]
                     if not income_df.empty:
                         summary = income_df.groupby("Categoria")["Valor"].sum().reset_index()
                         fig = px.pie(
@@ -330,13 +359,14 @@ with main_col:
                             hole=0.3,
                             color_discrete_sequence=px.colors.sequential.Blues
                         )
+                        fig.update_traces(textinfo='percent+label') # Mostra porcentagem e rótulo no gráfico
                         fig.update_layout(height=350, margin=dict(t=50, b=10, l=10, r=10)) # Diminui a altura
                         st.plotly_chart(fig, use_container_width=True)
                     else:
                         st.info("Nenhuma receita registrada.")
 
                 with tab2:
-                    expenses_df = df[df["Tipo"] == "Despesa"]
+                    expenses_df = df_g[df_g["Tipo"] == "Despesa"]
                     if not expenses_df.empty:
                         summary = expenses_df.groupby("Categoria")["Valor"].sum().reset_index()
                         fig = px.pie(
@@ -347,6 +377,7 @@ with main_col:
                             hole=0.3,
                             color_discrete_sequence=px.colors.sequential.Reds
                         )
+                        fig.update_traces(textinfo='percent+label')
                         fig.update_layout(height=350, margin=dict(t=50, b=10, l=10, r=10)) # Diminui a altura
                         st.plotly_chart(fig, use_container_width=True)
                     else:
@@ -354,7 +385,7 @@ with main_col:
 
     # --- Página: ANÁLISE ---
     elif st.session_state.page == "analise":
-        st.subheader("📊 Análise de Transações")
+        st.subheader("📊 Análise Detalhada")
 
         if df.empty:
             st.info("Nenhuma transação registrada ainda.")
@@ -362,32 +393,33 @@ with main_col:
             # Submenu para tipos de análise
             col1, col2, col3, col4 = st.columns(4)
             
+            # --- Buttons ---
             with col1:
                 if st.button("🧾 Despesas", use_container_width=True, type="primary" if st.session_state.analise_tipo == "despesas" else "secondary"):
                     st.session_state.analise_tipo = "despesas"
-                    st.rerun()  # <--- ADICIONADO PARA FORÇAR A ATUALIZAÇÃO
+                    st.rerun() 
             with col2:
                 if st.button("💵 Receitas", use_container_width=True, type="primary" if st.session_state.analise_tipo == "receitas" else "secondary"):
                     st.session_state.analise_tipo = "receitas"
-                    st.rerun()  # <--- ADICIONADO PARA FORÇAR A ATUALIZAÇÃO
+                    st.rerun() 
             with col3:
                 if st.button("📅 Mensal", use_container_width=True, type="primary" if st.session_state.analise_tipo == "mensal" else "secondary"):
                     st.session_state.analise_tipo = "mensal"
-                    st.rerun()  # <--- ADICIONADO PARA FORÇAR A ATUALIZAÇÃO
+                    st.rerun() 
             with col4:
                 if st.button("📆 Anual", use_container_width=True, type="primary" if st.session_state.analise_tipo == "anual" else "secondary"):
                     st.session_state.analise_tipo = "anual"
-                    st.rerun()  # <--- ADICIONADO PARA FORÇAR A ATUALIZAÇÃO
+                    st.rerun() 
 
             st.markdown("---")
 
-            # ... (Restante do código da análise)
+            df_a = df.copy()
             tipo = st.session_state.analise_tipo
 
             # 1️⃣ DESPESAS
             if tipo == "despesas":
                 st.caption("Distribuição de Despesas por Categoria")
-                expenses_df = df[df["Tipo"] == "Despesa"]
+                expenses_df = df_a[df_a["Tipo"] == "Despesa"]
                 if not expenses_df.empty:
                     summary = expenses_df.groupby("Categoria")["Valor"].sum().reset_index()
                     fig = px.pie(
@@ -397,19 +429,26 @@ with main_col:
                         hole=0.3,
                         color_discrete_sequence=px.colors.sequential.Reds
                     )
+                    fig.update_traces(textinfo='percent+label')
                     fig.update_layout(height=350, margin=dict(t=50, b=10, l=10, r=10))
                     st.plotly_chart(fig, use_container_width=True)
                     
                     st.caption("Detalhes das Despesas")
-                    st.dataframe(expenses_df[["Data", "Categoria", "Valor", "Descrição"]].sort_values("Data", ascending=False), 
-                                 use_container_width=True, height=200) # Altura reduzida
+                    # Cria um DataFrame para exibição com colunas formatadas
+                    df_display = expenses_df[["Data", "Categoria", "Valor", "Descrição"]].copy()
+                    df_display["Data"] = df_display["Data"].dt.strftime("%d/%m/%Y")
+                    df_display["Valor"] = df_display["Valor"].apply(format_currency)
+                    
+                    st.dataframe(df_display, 
+                                 column_order=["Data", "Categoria", "Valor", "Descrição"],
+                                 use_container_width=True, height=200) 
                 else:
                     st.info("Nenhuma despesa registrada.")
 
             # 2️⃣ RECEITAS
             elif tipo == "receitas":
                 st.caption("Distribuição de Receitas por Categoria")
-                income_df = df[df["Tipo"] == "Receita"]
+                income_df = df_a[df_a["Tipo"] == "Receita"]
                 if not income_df.empty:
                     summary = income_df.groupby("Categoria")["Valor"].sum().reset_index()
                     fig = px.pie(
@@ -419,22 +458,32 @@ with main_col:
                         hole=0.3,
                         color_discrete_sequence=px.colors.sequential.Blues
                     )
+                    fig.update_traces(textinfo='percent+label')
                     fig.update_layout(height=350, margin=dict(t=50, b=10, l=10, r=10))
                     st.plotly_chart(fig, use_container_width=True)
                     
                     st.caption("Detalhes das Receitas")
-                    st.dataframe(income_df[["Data", "Categoria", "Valor", "Descrição"]].sort_values("Data", ascending=False), 
-                                 use_container_width=True, height=200) # Altura reduzida
+                    # Cria um DataFrame para exibição com colunas formatadas
+                    df_display = income_df[["Data", "Categoria", "Valor", "Descrição"]].copy()
+                    df_display["Data"] = df_display["Data"].dt.strftime("%d/%m/%Y")
+                    df_display["Valor"] = df_display["Valor"].apply(format_currency)
+                    
+                    st.dataframe(df_display, 
+                                 column_order=["Data", "Categoria", "Valor", "Descrição"],
+                                 use_container_width=True, height=200)
                 else:
                     st.info("Nenhuma receita registrada.")
 
             # 3️⃣ COMPARATIVO MENSAL
             elif tipo == "mensal":
                 st.caption("Comparativo Mensal (Receita x Despesa)")
-                df["Ano"] = df["Data"].dt.year
+                df_a["Ano"] = df_a["Data"].dt.year
                 month_names_pt_br = {1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr', 5: 'Mai', 6: 'Jun', 7: 'Jul', 8: 'Ago', 9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez'}
-                df["Mês"] = df["Data"].dt.month.map(month_names_pt_br)
-                monthly_summary = df.groupby(["Ano", "Mês", "Tipo"])["Valor"].sum().reset_index()
+                df_a["Mês_Num"] = df_a["Data"].dt.month
+                df_a["Mês"] = df_a["Data"].dt.month.map(month_names_pt_br)
+                monthly_summary = df_a.groupby(["Ano", "Mês_Num", "Mês", "Tipo"])["Valor"].sum().reset_index()
+                monthly_summary.sort_values(by=["Ano", "Mês_Num"], inplace=True) 
+
                 month_order = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
                 
                 if not monthly_summary.empty:
@@ -448,7 +497,8 @@ with main_col:
                         color_discrete_map={"Receita": "#1E90FF", "Despesa": "#DC143C"},
                         category_orders={"Mês": month_order} 
                     )
-                    fig.update_layout(height=350, margin=dict(t=50, b=10, l=10, r=10))
+                    fig.update_layout(height=350, margin=dict(t=50, b=10, l=10, r=10), uniformtext_minsize=8, uniformtext_mode='hide')
+                    fig.update_yaxes(title_text="Valor (R$)") 
                     st.plotly_chart(fig, use_container_width=True)
                 else:
                     st.info("Sem dados mensais para exibir.")
@@ -456,8 +506,8 @@ with main_col:
             # 4️⃣ COMPARATIVO ANUAL
             elif tipo == "anual":
                 st.caption("Comparativo Anual (Receita x Despesa)")
-                df["Ano"] = df["Data"].dt.year
-                yearly_summary = df.groupby(["Ano", "Tipo"])["Valor"].sum().reset_index()
+                df_a["Ano"] = df_a["Data"].dt.year
+                yearly_summary = df_a.groupby(["Ano", "Tipo"])["Valor"].sum().reset_index()
                 if not yearly_summary.empty:
                     fig = px.bar(
                         yearly_summary,
@@ -467,7 +517,8 @@ with main_col:
                         barmode="group",
                         color_discrete_map={"Receita": "#1E90FF", "Despesa": "#DC143C"},
                     )
-                    fig.update_layout(height=350, margin=dict(t=50, b=10, l=10, r=10))
+                    fig.update_layout(height=350, margin=dict(t=50, b=10, l=10, r=10), uniformtext_minsize=8, uniformtext_mode='hide')
+                    fig.update_yaxes(title_text="Valor (R$)") 
                     st.plotly_chart(fig, use_container_width=True)
                 else:
                     st.info("Sem dados anuais para exibir.")
@@ -479,40 +530,42 @@ with main_col:
         if df.empty:
             st.info("Nenhuma transação registrada.")
         else:
+            # Prepara o DataFrame para exibição (com formatação e ID)
             df_display = df.copy()
-            df_display["Data"] = df_display["Data"].dt.strftime("%d/%m/%Y")
-            df_display.reset_index(inplace=True) 
+            df_display.reset_index(inplace=True, drop=False) # Mantém o índice como coluna "ID"
             df_display.rename(columns={"index": "ID"}, inplace=True)
             
-            valid_ids = df_display["ID"].tolist()
-            
-            # Altura reduzida para caber na página
-            st.dataframe(df_display[["ID", "Data", "Tipo", "Categoria", "Valor", "Descrição"]].sort_values(by="Data", ascending=False), 
-                        use_container_width=True, 
-                        height=250)
+            # Formatação das colunas para melhor visualização
+            df_display["Data"] = df_display["Data"].dt.strftime("%d/%m/%Y")
+            df_display["Valor"] = df_display["Valor"].apply(format_currency)
+
+            # Exibe o histórico de transações
+            st.dataframe(df_display[["ID", "Data", "Tipo", "Categoria", "Valor", "Descrição"]], 
+                         column_order=["ID", "Data", "Tipo", "Categoria", "Valor", "Descrição"],
+                         use_container_width=True, 
+                         height=250)
 
             st.markdown("---")
             
             st.caption("🗑️ Excluir Transação")
             
+            valid_ids = df_display["ID"].tolist()
+            
             if valid_ids:
-                default_id = valid_ids[0] if valid_ids else None
-                try:
-                    default_index = valid_ids.index(default_id)
-                except ValueError:
-                    default_index = 0
-                    
-                selected_id = st.selectbox("Selecione o ID da transação:", valid_ids, index=default_index)
+                # Seleciona o ID do topo
+                selected_id = st.selectbox("Selecione o ID da transação:", valid_ids, index=0)
                 
                 selected_row = df_display.loc[df_display["ID"] == selected_id]
-                st.caption("Transação selecionada:")
-                st.dataframe(selected_row, use_container_width=True)
+                st.caption("Transação selecionada (Confirmação):")
+                # Exibe a transação selecionada para confirmação (altura menor)
+                st.dataframe(selected_row[["ID", "Data", "Tipo", "Categoria", "Valor", "Descrição"]], 
+                             use_container_width=True, 
+                             height=50)
 
-                if st.button("Excluir Transação", type="secondary"):
-                    st.session_state.df = delete_transaction(st.session_state.df, selected_id)
+                if st.button("Excluir Transação", type="secondary", key="delete_button"):
+                    # O ID selecionado é o índice original no DataFrame do st.session_state
+                    st.session_state.df = delete_transaction(st.session_state.df, selected_id) 
                     st.success("Transação excluída com sucesso!")
                     st.rerun()
             else:
-
                 st.info("Nenhuma transação disponível para exclusão.")
-
