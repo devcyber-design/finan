@@ -18,6 +18,7 @@ def format_currency(value):
 
 # --- Funções de Dados ---
 def load_data():
+    # ... (Resto da função load_data)
     """Carrega os dados do arquivo CSV ou cria um DataFrame vazio."""
     if os.path.exists(FILE_PATH):
         try:
@@ -35,10 +36,12 @@ def load_data():
     return df
 
 def save_data(df):
+    # ... (Resto da função save_data)
     """Salva o DataFrame no arquivo CSV."""
     df.to_csv(FILE_PATH, index=False)
 
 def add_transaction(df, date, type, category, value, description, parcelas=1):
+    # ... (Resto da função add_transaction)
     """Adiciona uma transação, com suporte a parcelamento."""
     new_rows = []
     # Cria uma linha para cada parcela
@@ -62,12 +65,14 @@ def add_transaction(df, date, type, category, value, description, parcelas=1):
     return df
 
 def delete_transaction(df, index):
+    # ... (Resto da função delete_transaction)
     """Exclui uma transação pelo índice."""
     df = df.drop(index).reset_index(drop=True)
     save_data(df)
     return df
 
 def get_categories(transaction_type):
+    # ... (Resto da função get_categories)
     """Retorna as categorias baseadas no tipo de transação."""
     income_categories = ["Salário", "Investimento", "Freelance", "Presente", "Vendas", "Outros"]
     expense_categories = ["Alimentação", "Transporte", "Moradia", "Lazer", "Saúde", "Educação", "Contas", "Compras", "Outros"]
@@ -80,39 +85,107 @@ def get_categories(transaction_type):
 # --- Layout ---
 st.set_page_config(page_title="Gestor Financeiro", page_icon="💰", layout="wide")
 
-# --- CSS Personalizado para diminuir o espaço superior e otimizar espaço ---
-# MANTIDO O SEU EXCELENTE CÓDIGO CSS
+# ----------------------------------------------------------------------------------
+# --- INJEÇÃO DE CSS E HTML PARA DESTAQUE DO MENU (MOVIDO PARA O TOPO) ---
+# ----------------------------------------------------------------------------------
+
+# 1. Injetar o texto "MENU" usando um elemento DIV e posicionamento absoluto.
+st.markdown("""
+<div id="menu-label-custom">MENU</div>
+""", unsafe_allow_html=True)
+
 st.markdown("""
 <style>
 /* 1. Máxima Redução de Margem Superior */
-/* Altera o padding-top do bloco de conteúdo principal */
-.css-1y4p8ic {
-    padding-top: 0rem; 
-}
-/* Diminui padding no topo e nas laterais do conteúdo principal (para wide layout) */
-section.main {
+.css-1y4p8ic { padding-top: 0rem; }
+section.main { 
     padding-top: 0rem; 
     padding-right: 1rem;
     padding-left: 1rem;
     padding-bottom: 0rem; 
 }
-/* Remove a margem superior do título (h1) que costuma empurrar o conteúdo */
-h1 {
-    margin-top: 0rem !important; 
-    padding-top: 0rem !important;
+h1 { margin-top: 0rem !important; padding-top: 0rem !important; }
+h2 { margin-top: 0rem !important; padding-top: 0rem !important; }
+.stButton, .stRadio, .stSelectbox, .stTextInput, .stNumberInput { margin-bottom: -5px; }
+.stForm { padding-bottom: 5px; }
+
+
+/* ---------------------------------------------------- */
+/* 2. DESTAQUE DO BOTÃO DE ABRIR/FECHAR SIDEBAR */
+/* ---------------------------------------------------- */
+
+/* Seletor mais robusto para o botão de toggle do sidebar (por data-testid) */
+[data-testid="stSidebarToggleButton"] {
+    /* Destaque do botão */
+    background-color: #FF5733 !important; /* Laranja/Vermelho (Destaque) */
+    color: white !important; 
+    border: 3px solid #C70039 !important; 
+    border-radius: 5px !important;
+    
+    /* Z-index alto para garantir que fique por cima de outros elementos */
+    z-index: 1000; 
 }
-/* Remove a margem superior dos subtítulos (h2) para subir o conteúdo da página atual */
-h2 {
-    margin-top: 0rem !important;
-    padding-top: 0rem !important;
+
+/* Efeito Hover */
+[data-testid="stSidebarToggleButton"]:hover {
+    background-color: #C70039 !important;
+    border-color: #FF5733 !important;
 }
-/* Diminui o espaçamento dos elementos (para caber em uma página) */
-.stButton, .stRadio, .stSelectbox, .stTextInput, .stNumberInput {
-    margin-bottom: -5px;
+
+/* ---------------------------------------------------- */
+/* 3. POSICIONAMENTO DO TEXTO "MENU" INJETADO */
+/* ---------------------------------------------------- */
+
+#menu-label-custom {
+    /* Estilo do texto */
+    font-size: 16px;
+    font-weight: 800;
+    color: #F0F8FF; /* Branco Gelo para alto contraste */
+    background-color: #FF5733; /* Cor de fundo de destaque */
+    padding: 5px 8px;
+    border: 3px solid #C70039;
+    border-right: none; /* Remove a borda direita para colar no botão */
+    border-radius: 5px 0 0 5px; /* Arredonda apenas a esquerda */
+    
+    /* Posicionamento Fixo/Absoluto na Header */
+    position: fixed; /* Fica fixo na tela */
+    top: 0px; 
+    left: 0px; 
+    height: 35px; /* Altura do botão */
+    display: flex;
+    align-items: center; /* Centraliza verticalmente o texto */
+    z-index: 1000; /* Z-index alto */
+    
+    /* Ajuste fino para não sobrepor o botão (move a largura do texto) */
+    transform: translateX(10px); /* Move 10px para dentro da header do Streamlit */
+    /* Garante que o display inicial é bloco */
+    display: flex !important;
 }
-.stForm {
-    padding-bottom: 5px;
+
+/* Garante que o rótulo do menu desapareça se o menu lateral estiver visível (Streamlit adiciona a classe .css-169m05z quando a sidebar abre) */
+/* A classe .css-169m05z é um exemplo de seletor que indica que a sidebar está aberta. Deve funcionar na maioria das versões. */
+.css-169m05z #menu-label-custom {
+    display: none !important; 
 }
+
+/* Ajuste fino: move o botão de menu (>> ) para a direita do texto MENU */
+/* Seletor para a header do Streamlit */
+.stApp header {
+    position: relative; 
+}
+
+/* Move o botão (>> ) para a direita do texto (apenas quando o menu está fechado) */
+.stApp header [data-testid="stSidebarToggleButton"] {
+    transform: translateX(75px); /* Move o botão (tamanho aproximado do "MENU") */
+    transition: transform 0.2s ease-in-out; /* Transição suave */
+}
+
+/* Quando a sidebar abre, volta à posição original (sem a classe .css-169m05z) */
+.css-169m05z [data-testid="stSidebarToggleButton"] {
+    transform: translateX(0px) !important; 
+}
+
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -146,10 +219,10 @@ if not df.empty:
 
 st.sidebar.title("Gestor Financeiro")
 
-# Mapeamento para os botões (ADICIONANDO RESUMO)
+# Mapeamento para os botões 
 pages = {
     "➕ Lançamento": "lancamento",
-    "✨ Resumo": "resumo",       # Adiciona a página de Resumo
+    "✨ Resumo": "resumo",       
     "🏠 Visão Geral": "visao_geral",
     "📊 Análise": "analise",
     "📅 Histórico": "historico"
@@ -200,7 +273,7 @@ with metric_col:
 # ----------------------------------------------------------------------------------
 with main_col:
     
-    # --- Página: RESUMO (NOVA PÁGINA) ---
+    # --- Página: RESUMO ---
     if st.session_state.page == "resumo":
         st.subheader("✨ Resumo Financeiro")
         
@@ -236,7 +309,7 @@ with main_col:
             
             st.markdown("---")
             
-            # --- NOVO GRÁFICO: EVOLUÇÃO CUMULATIVA (RECEITA, DESPESA E SALDO) ---
+            # --- GRÁFICO: EVOLUÇÃO CUMULATIVA (RECEITA, DESPESA E SALDO) ---
             st.caption("Evolução Cumulativa: Receitas, Despesas e Saldo")
 
             # 1. Copiar e ordenar por Data (ascendente para o cumulativo)
